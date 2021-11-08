@@ -13,11 +13,13 @@
 #define interruptPin 3
 
 volatile bool mpuReady = false;
-int16_t acceleration[3], gyro[3];
+int16_t acceleration[3];
+// int16_t gyro[3];
 
 // mpu6050 address
 uint8_t mpuAddr = 0x68;
 
+#define mpuScale 16384.0
 // The accelerometers’sensitivity per LSBi = 16384.0 for +-2g
 
 #ifdef i2c_default
@@ -81,14 +83,14 @@ float AccErrorX, AccErrorY, AccErrorZ;
 void calculate_IMU_error()
 {
     float AccX, AccY, AccZ;
-    float GyroX, GyroY, GyroZ;
+    // float GyroX, GyroY, GyroZ;
     int c = 0;
     while (c++ < 200)
     {
         read_mpu_data();
-        AccX = acceleration[0] / 16384.0;
-        AccY = acceleration[1] / 16384.0;
-        AccZ = acceleration[2] / 16384.0;
+        AccX = acceleration[0] / mpuScale;
+        AccY = acceleration[1] / mpuScale;
+        AccZ = acceleration[2] / mpuScale;
 
         // TODO: find better way to calculate average error
         AccErrorX = AccErrorX + AccX; // ((atan((AccY) / sqrt(pow((AccX), 2) + pow((AccZ), 2))) * 180 / M_PI));
@@ -161,8 +163,8 @@ int main()
             gpio_put(ledPin, !gpio_get(ledPin));
 
             read_mpu_data();
-            // printf("%f,%f,%f,%d,%d,%d\n", acceleration[0] / 16384.0, acceleration[1] / 16384.0, acceleration[2] / 16384.0, gyro[0], gyro[1], gyro[2]);
-            printf("Acc.X = %f\tAcc.Y = %f\tAcc.Z = %f\n", (float)acceleration[0] / 16384.0, (float)acceleration[1] / 16384.0, (float)acceleration[2] / 16384.0);
+            // printf("%f,%f,%f,%d,%d,%d\n", acceleration[0] / mpuScale, acceleration[1] / mpuScale, acceleration[2] / mpuScale, gyro[0], gyro[1], gyro[2]);
+            printf("Acc.X = %f\tAcc.Y = %f\tAcc.Z = %f\n", (float)acceleration[0] / mpuScale, (float)acceleration[1] / mpuScale, (float)acceleration[2] / mpuScale);
             // printf("Gyro. X = %d\tY = %d\tZ = %d\n", gyro[0], gyro[1], gyro[2]);
         }
         sleep_ms(100);
