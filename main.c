@@ -59,48 +59,48 @@ static void read_mpu_data()
 }
 #endif
 
-float AccErrorX, AccErrorY, AccErrorZ;
-float gyroErrorX, gyroErrorY, gyroErrorZ;
-void calculate_IMU_error()
-{
-    float AccX, AccY, AccZ;
-    float GyroX, GyroY, GyroZ;
-    int c = 0;
-    while (c++ < 200)
-    {
-        read_mpu_data();
-        AccX = acceleration[0] / accScale;
-        AccY = acceleration[1] / accScale;
-        AccZ = acceleration[2] / accScale;
+const float AccErrorX = -0.426656, AccErrorY = -0.015939, AccErrorZ = 0.985365;
+const float gyroErrorX = 7.276831, gyroErrorY = 2.669962, gyroErrorZ = -2.213282;
+// void calculate_IMU_error()
+// {
+//     float AccX, AccY, AccZ;
+//     float GyroX, GyroY, GyroZ;
+//     int c = 0;
+//     while (c++ < 200)
+//     {
+//         read_mpu_data();
+//         AccX = acceleration[0] / accScale;
+//         AccY = acceleration[1] / accScale;
+//         AccZ = acceleration[2] / accScale;
 
-        // TODO: find better way to calculate average error
-        AccErrorX = AccErrorX + AccX; // ((atan((AccY) / sqrt(pow((AccX), 2) + pow((AccZ), 2))) * 180 / M_PI));
-        AccErrorY = AccErrorY + AccY; // ((atan(-1 * (AccX) / sqrt(pow((AccY), 2) + pow((AccZ), 2))) * 180 / M_PI));
-        AccErrorZ = AccErrorZ + AccZ;
-    }
-    //Divide the sum by 200 to get the error value
-    AccErrorX = AccErrorX / 200;
-    AccErrorY = AccErrorY / 200;
-    AccErrorZ = AccErrorZ / 200;
-    c = 0;
-    // Read gyro values 200 times
-    while (c++ < 200)
-    {
-        read_mpu_data();
-        GyroX = gyro[0] / gyroScale;
-        GyroY = gyro[1] / gyroScale;
-        GyroZ = gyro[2] / gyroScale;
+//         // TODO: find better way to calculate average error
+//         AccErrorX = AccErrorX + AccX; // ((atan((AccY) / sqrt(pow((AccX), 2) + pow((AccZ), 2))) * 180 / M_PI));
+//         AccErrorY = AccErrorY + AccY; // ((atan(-1 * (AccX) / sqrt(pow((AccY), 2) + pow((AccZ), 2))) * 180 / M_PI));
+//         AccErrorZ = AccErrorZ + AccZ;
+//     }
+//     //Divide the sum by 200 to get the error value
+//     AccErrorX = AccErrorX / 200;
+//     AccErrorY = AccErrorY / 200;
+//     AccErrorZ = AccErrorZ / 200;
+//     c = 0;
+//     // Read gyro values 200 times
+//     while (c++ < 200)
+//     {
+//         read_mpu_data();
+//         GyroX = gyro[0] / gyroScale;
+//         GyroY = gyro[1] / gyroScale;
+//         GyroZ = gyro[2] / gyroScale;
 
-        gyroErrorX = gyroErrorX + GyroX;
-        gyroErrorY = gyroErrorY + GyroY;
-        gyroErrorZ = gyroErrorZ + GyroZ;
-    }
-    //Divide the sum by 200 to get the error value
-    gyroErrorX = gyroErrorX / 200;
-    gyroErrorY = gyroErrorY / 200;
-    gyroErrorZ = gyroErrorZ / 200;
-    // Print the error values on the Serial Monitor
-}
+//         gyroErrorX = gyroErrorX + GyroX;
+//         gyroErrorY = gyroErrorY + GyroY;
+//         gyroErrorZ = gyroErrorZ + GyroZ;
+//     }
+//     //Divide the sum by 200 to get the error value
+//     gyroErrorX = gyroErrorX / 200;
+//     gyroErrorY = gyroErrorY / 200;
+//     gyroErrorZ = gyroErrorZ / 200;
+//     // Print the error values on the Serial Monitor
+// }
 bool timer_callback(struct repeating_timer *timer)
 {
     gpio_put(ledPin, !gpio_get(ledPin));
@@ -128,7 +128,7 @@ int main()
     gpio_pull_up(PICO_DEFAULT_I2C_SCL_PIN);
 
     mpu_reset();
-    calculate_IMU_error();
+    // calculate_IMU_error();
 
     struct repeating_timer outputTimer;
     // here a timer is set to sample the mpu every 16ms (62.5 khz)
@@ -137,9 +137,9 @@ int main()
     {
         if (mpuReady)
         {
-            // printf("%f\t%f\t%f\n%f\t%f\t%f\n", AccErrorX, AccErrorY, AccErrorZ, gyroErrorX, gyroErrorY, gyroErrorZ); // -0.42,-0.02,-0.96, 7.25,2.81,-2.72
-            printf("%f\t%f\t%f\t%f\t%f\t%f\n", (float)acceleration[0] / accScale, (float)acceleration[1] / accScale, (float)acceleration[2] / accScale,
-                   (float)gyro[0] / gyroScale, (float)gyro[1] / gyroScale, (float)gyro[2] / gyroScale);
+            // printf("%f\t%f\t%f\n%f\t%f\t%f\n", AccErrorX, AccErrorY, AccErrorZ, gyroErrorX, gyroErrorY, gyroErrorZ); // -0.426656,-0.015939,0.985365,7.276831,2.669962,-2.213282
+            printf("%f\t%f\t%f\t%f\t%f\t%f\n", ((float)acceleration[0] / accScale) - AccErrorX, ((float)acceleration[1] / accScale) - AccErrorY, ((float)acceleration[2] / accScale) - AccErrorZ,
+                   ((float)gyro[0] / gyroScale) - gyroErrorX, ((float)gyro[1] / gyroScale) - gyroErrorY, ((float)gyro[2] / gyroScale) - gyroErrorZ);
 
             // printf("Acc.X = %f\tAcc.Y = %f\tAcc.Z = %f\n", (float)acceleration[0] / accScale, (float)acceleration[1] / accScale, (float)acceleration[2] / accScale);
             // printf("Gyro.X = %f\tGyro.Y = %f\tGyro.Z = %f\n", (float)gyro[0] / gyroScale, (float)gyro[1] / gyroScale, (float)gyro[2] / gyroScale);
