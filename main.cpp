@@ -3,7 +3,8 @@
 #include "pico/binary_info.h"
 #include "hardware/i2c.h"
 #include "hardware/uart.h"
-
+#include "./ei_classifier_porting.cpp"
+#include "ei_run_classifier.h"
 //  MPU SCL -> PICO GPIO 5
 //  MPU SDA -> PICO GPIO 4
 //  HC-05 TX -> PICO GGPIO 0
@@ -17,7 +18,7 @@
 // The gyroscope’s sensitivity per LSBi =  32.8 for +-1000 deg/s
 #define gyroSensitivity 32.8
 
-#define BD_RATE 9600    
+#define BD_RATE 9600
 
 volatile bool mpuReady = false;
 int16_t acceleration[3], gyro[3];
@@ -198,7 +199,6 @@ void calibrate_mpu()
 
 bool timer_callback(struct repeating_timer *timer)
 {
-    gpio_put(ledPin, !gpio_get(ledPin));
     mpuReady = true;
     return true;
 }
@@ -236,24 +236,45 @@ int main()
     add_repeating_timer_ms(16, timer_callback, NULL, &outputTimer);
     while (true)
     {
-        if (mpuReady)
-        {
-            read_mpu_data();
-            // printf("errors = %f\t%f\t%f\t%f\t%f\t%f\n", AccErrorX, AccErrorY, AccErrorZ, gyroErrorX, gyroErrorY, gyroErrorZ);
-            // without error
-            printf("%f\t%f\t%f\t%f\t%f\t%f\n",
-                   ((float)acceleration[0] / accSensitivity) - AccErrorX,
-                   ((float)acceleration[1] / accSensitivity) - AccErrorY,
-                   ((float)acceleration[2] / accSensitivity) - AccErrorZ,
-                   ((float)gyro[0] / gyroSensitivity) - gyroErrorX,
-                   ((float)gyro[1] / gyroSensitivity) - gyroErrorY,
-                   ((float)gyro[2] / gyroSensitivity) - gyroErrorZ);
+        float buffer[EI_CLASSIFIER_DSP_INPUT_FRAME_SIZE] = {0};
 
-            // with error
-            // printf("Acc.X = %f\tAcc.Y = %f\tAcc.Z = %f\n", (float)acceleration[0] / accSensitivity, (float)acceleration[1] / accSensitivity, (float)acceleration[2] / accSensitivity);
-            // printf("Gyro.X = %f\tGyro.Y = %f\tGyro.Z = %f\n\n", (float)gyro[0] / gyroSensitivity, (float)gyro[1] / gyroSensitivity, (float)gyro[2] / gyroSensitivity);
-            mpuReady = false;
+        gpio_put(ledPin, !gpio_get(ledPin));
+        for (size_t i = 0; i < EI_CLASSIFIER_DSP_INPUT_FRAME_SIZE; i += 6)
+        {
+            // Determine the next tick (and then sleep later)
+            uint64_t next_tick = ei_read_timer_us() + (EI_CLASSIFIER_INTERVAL_MS * 1000);
+            read_mpu_data();
+            buffer[i] = acceleration[0] / accSensitivity;
+            buffer[i + 1] = acceleration[1] / accSensitivity;
+            buffer[i + 2] = acceleration[2] / accSensitivity;
+            buffer[i + 3] = gyro[0] / gyroSensitivity;
+            buffer[i + 4] = gyro[1] / gyroSensitivity;
+            buffer[i + 5] = gyro[2] / gyroSensitivity;
+
+            sleep_us(next_tick - ei_read_timer_us());
         }
+        signal_t signal;
+        int err = numpy::signal_from_buffer(buffer, EI_CLASSIFIER_DSP_INPUT_FRAME_SIZE, &signal);
+        ei_impulse_result_t result = {0};
+        err = run_classifier(&signal, &result, false);
+        // ei_printf("Predictions ");
+        // ei_printf("(DSP: %d ms., Classification: %d ms., Anomaly: %d ms.)",
+        //           result.timing.dsp, result.timing.classification, result.timing.anomaly);
+        // ei_printf(": \n");
+
+        // find index of class with highest probability
+        int mxIdx = 0;
+        float mx = -1;
+        for (size_t ix = 0; ix < EI_CLASSIFIER_LABEL_COUNT; ix++)
+        {
+            if (result.classification[ix].value >= mx)
+            {
+                mx = result.classification[ix].value;
+                mxIdx = ix;
+            }
+        }
+        // print class with highest probability
+        ei_printf("%s: %.5f\n", result.classification[mxIdx].label, result.classification[mxIdx].value);
     }
 
     return 0;
