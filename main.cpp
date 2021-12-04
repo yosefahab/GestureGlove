@@ -2,15 +2,22 @@
 #include "pico/stdlib.h"
 #include "pico/binary_info.h"
 #include "hardware/i2c.h"
+#include "hardware/uart.h"
 
 //  MPU SCL -> PICO GPIO 5
 //  MPU SDA -> PICO GPIO 4
-
+//  HC-05 TX -> PICO GGPIO 0
+//  HC-05 RX -> PICO GGPIO 1
 #define ledPin 25
-// The accelerometer's sensitivity per LSBi = 16384.0 for +-2g
-#define accSensitivity 16384.0
-// The gyroscope’s sensitivity per LSBi = 131.0 for +-250 deg
-#define gyroSensitivity 131.0
+#define UART_TX_PIN 0
+#define UART_RX_PIN 1
+#define UART_ID uart0
+// The accelerometer's sensitivity per LSBi = 4096.0 for +-8g
+#define accSensitivity 4096.0
+// The gyroscope’s sensitivity per LSBi =  32.8 for +-1000 deg/s
+#define gyroSensitivity 32.8
+
+#define BD_RATE 9600    
 
 volatile bool mpuReady = false;
 int16_t acceleration[3], gyro[3];
@@ -64,14 +71,14 @@ static void setup_mpu()
     buffer[1] = 0x00;
     i2c_write_blocking(i2c_default, mpuAddr, buffer, 2, true);
 
-    // set accelerometer full-scale to 2g, max sensitivity
+    // set accelerometer full-scale to +-10g, least sensitivity
     buffer[0] = 0x1C;
-    buffer[1] = 0x00;
+    buffer[1] = 0x10;
     i2c_write_blocking(i2c_default, mpuAddr, buffer, 2, true);
 
-    // Set gyro full-scale to 250 degrees/sec, max sensitivity
+    // Set gyro full-scale to +-1000 degrees/sec, least sensitivity
     buffer[0] = 0x1B;
-    buffer[1] = 0x00;
+    buffer[1] = 0x10;
     i2c_write_blocking(i2c_default, mpuAddr, buffer, 2, false);
 
     sleep_ms(100);
@@ -209,11 +216,17 @@ int main()
     gpio_set_dir(ledPin, GPIO_OUT);
 
     // Initialize I2C HW block, and set baud rate
-    i2c_init(i2c_default, 62500);
+    i2c_init(i2c_default, BD_RATE);
     gpio_set_function(PICO_DEFAULT_I2C_SDA_PIN, GPIO_FUNC_I2C);
     gpio_set_function(PICO_DEFAULT_I2C_SCL_PIN, GPIO_FUNC_I2C);
     gpio_pull_up(PICO_DEFAULT_I2C_SDA_PIN);
     gpio_pull_up(PICO_DEFAULT_I2C_SCL_PIN);
+
+    // Initialize UART
+    uart_init(UART_ID, BD_RATE);
+    // 0 is TX 1 is RX
+    gpio_set_function(UART_TX_PIN, GPIO_FUNC_UART);
+    gpio_set_function(UART_RX_PIN, GPIO_FUNC_UART);
 
     setup_mpu();
     calibrate_mpu();
@@ -226,11 +239,17 @@ int main()
         if (mpuReady)
         {
             read_mpu_data();
-            printf("errors = %f\t%f\t%f\t%f\t%f\t%f\n", AccErrorX, AccErrorY, AccErrorZ, gyroErrorX, gyroErrorY, gyroErrorZ);
-            printf("reads  = %f\t%f\t%f\t%f\t%f\t%f\n\n",
-                   ((float)acceleration[0] / accSensitivity) - AccErrorX, ((float)acceleration[1] / accSensitivity) - AccErrorY, ((float)acceleration[2] / accSensitivity) - AccErrorZ,
-                   ((float)gyro[0] / gyroSensitivity) - gyroErrorX, ((float)gyro[1] / gyroSensitivity) - gyroErrorY, ((float)gyro[2] / gyroSensitivity) - gyroErrorZ);
+            // printf("errors = %f\t%f\t%f\t%f\t%f\t%f\n", AccErrorX, AccErrorY, AccErrorZ, gyroErrorX, gyroErrorY, gyroErrorZ);
+            // without error
+            printf("%f\t%f\t%f\t%f\t%f\t%f\n",
+                   ((float)acceleration[0] / accSensitivity) - AccErrorX,
+                   ((float)acceleration[1] / accSensitivity) - AccErrorY,
+                   ((float)acceleration[2] / accSensitivity) - AccErrorZ,
+                   ((float)gyro[0] / gyroSensitivity) - gyroErrorX,
+                   ((float)gyro[1] / gyroSensitivity) - gyroErrorY,
+                   ((float)gyro[2] / gyroSensitivity) - gyroErrorZ);
 
+            // with error
             // printf("Acc.X = %f\tAcc.Y = %f\tAcc.Z = %f\n", (float)acceleration[0] / accSensitivity, (float)acceleration[1] / accSensitivity, (float)acceleration[2] / accSensitivity);
             // printf("Gyro.X = %f\tGyro.Y = %f\tGyro.Z = %f\n\n", (float)gyro[0] / gyroSensitivity, (float)gyro[1] / gyroSensitivity, (float)gyro[2] / gyroSensitivity);
             mpuReady = false;
