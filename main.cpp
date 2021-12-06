@@ -197,12 +197,6 @@ void calibrate_mpu()
     gyroErrorZ /= gyroSensitivity;
 }
 
-bool timer_callback(struct repeating_timer *timer)
-{
-    mpuReady = true;
-    return true;
-}
-
 int main()
 {
 
@@ -231,18 +225,15 @@ int main()
     setup_mpu();
     calibrate_mpu();
 
-    struct repeating_timer outputTimer;
-    // here a timer is set to sample the mpu every 16ms (62.5 khz)
-    add_repeating_timer_ms(16, timer_callback, NULL, &outputTimer);
     while (true)
     {
-        float buffer[EI_CLASSIFIER_DSP_INPUT_FRAME_SIZE] = {0};
-
         gpio_put(ledPin, !gpio_get(ledPin));
+
+        float buffer[EI_CLASSIFIER_DSP_INPUT_FRAME_SIZE] = {0};
         for (size_t i = 0; i < EI_CLASSIFIER_DSP_INPUT_FRAME_SIZE; i += 6)
         {
             // Determine the next tick (and then sleep later)
-            uint64_t next_tick = ei_read_timer_us() + (EI_CLASSIFIER_INTERVAL_MS * 1000);
+            uint64_t next_tick = ei_read_timer_ms() + EI_CLASSIFIER_INTERVAL_MS;
             read_mpu_data();
             buffer[i] = acceleration[0] / accSensitivity;
             buffer[i + 1] = acceleration[1] / accSensitivity;
@@ -251,18 +242,13 @@ int main()
             buffer[i + 4] = gyro[1] / gyroSensitivity;
             buffer[i + 5] = gyro[2] / gyroSensitivity;
 
-            sleep_us(next_tick - ei_read_timer_us());
+            sleep_ms(next_tick - ei_read_timer_ms());
         }
         signal_t signal;
         int err = numpy::signal_from_buffer(buffer, EI_CLASSIFIER_DSP_INPUT_FRAME_SIZE, &signal);
         ei_impulse_result_t result = {0};
         err = run_classifier(&signal, &result, false);
-        // ei_printf("Predictions ");
-        // ei_printf("(DSP: %d ms., Classification: %d ms., Anomaly: %d ms.)",
-        //           result.timing.dsp, result.timing.classification, result.timing.anomaly);
-        // ei_printf(": \n");
 
-        // find index of class with highest probability
         int mxIdx = 0;
         float mx = -1;
         for (size_t ix = 0; ix < EI_CLASSIFIER_LABEL_COUNT; ix++)
@@ -274,7 +260,8 @@ int main()
             }
         }
         // print class with highest probability
-        ei_printf("%s: %.5f\n", result.classification[mxIdx].label, result.classification[mxIdx].value);
+        // printf("%s: %.5f\n", result.classification[mxIdx].label, result.classification[mxIdx].value);
+        printf("%s\n", result.classification[mxIdx].label);
     }
 
     return 0;
