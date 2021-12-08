@@ -230,7 +230,7 @@ int main()
         gpio_put(ledPin, !gpio_get(ledPin));
 
         float buffer[EI_CLASSIFIER_DSP_INPUT_FRAME_SIZE] = {0};
-        for (size_t i = 0; i < EI_CLASSIFIER_DSP_INPUT_FRAME_SIZE; i += 6)
+        for (size_t i = 0; i < EI_CLASSIFIER_DSP_INPUT_FRAME_SIZE; i += EI_CLASSIFIER_LABEL_COUNT)
         {
             // Determine the next tick (and then sleep later)
             uint64_t next_tick = ei_read_timer_ms() + EI_CLASSIFIER_INTERVAL_MS;
