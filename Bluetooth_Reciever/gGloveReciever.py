@@ -24,7 +24,7 @@ def performAction(gest):
 
 def main():
     # change COM accordingly
-    ser = serial.Serial("COM5",115200,Timeout =1)
+    ser = serial.Serial("COM5",115200)
     while True:
         gest = retrieveData(ser).strip()
         print("Read:",gest,"Action:",gestures.get(gest))
