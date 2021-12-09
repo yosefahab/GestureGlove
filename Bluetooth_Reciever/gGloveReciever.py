@@ -3,48 +3,56 @@ import pyautogui
 import time
 import sys
 
-gestures = { "idle": None,
-             "up-swipe": "volumeup",
-             "down-swipe": "volumedown",
-             "right-tilt": "nexttrack",
-             "left-tilt": "prevtrack",
-             "circular": "playpause"}
+gestures = {"idle": None,
+            "up-swipe": "volumeup",
+            "down-swipe": "volumedown",
+            "right-tilt": "nexttrack",
+            "left-tilt": "prevtrack",
+            "circular": "playpause"}
+
 
 def retrieveData(ser):
     return ser.readline().decode("ascii")
 
+
 prevKey = "idle"
+
 
 def performAction(gest):
     global prevKey
     # prevents double actions (essentially canceling or doubling previous action)
-    if prevKey != gest and gest !="idle":
+    if prevKey != gest and gest != "idle":
         pyautogui.press(gestures.get(gest))
     prevKey = gest
     return
 
+
 def main(argv):
     try:
+        if len(argv) != 2:
+            raise Exception("Please specify port!")
         # COM passed in program argv
         com = argv[1]
-        print("Searching for Device on port: %s..." %com)
-        ser = serial.Serial(com,115200,timeout=7)
-    except:
+        print("Searching for Device on port: %s..." % com)
+        ser = serial.Serial(com, 115200, timeout=10)
+    except OSError:
         print("Device not Connected! Terminating...")
-        exit(1)
+    except Exception as e:
+        print(e)
     else:
-        print("Listening to device on port: %s!" %com)
+        print("Listening to device on port: %s!" % com)
         while True:
             time.sleep(.75)
-            try:                    
+            try:
                 gest = retrieveData(ser).strip()
                 # remove this print if uninterested in output
-                print("Read:",gest,"Action:",gestures.get(gest))
+                print("Read:", gest, "Action:", gestures.get(gest))
                 performAction(gest)
             except:
                 print("Device Disconnected! Terminating...")
                 ser.close()
                 exit(1)
+
 
 if __name__ == "__main__":
     main(sys.argv)
