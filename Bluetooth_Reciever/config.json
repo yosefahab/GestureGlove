@@ -1,0 +1,32 @@
+{
+    "Default": [
+        {
+            "idle": "None",
+            "up-swipe": "volumeup",
+            "down-swipe": "volumedown",
+            "right-tilt": "nexttrack",
+            "left-tilt": "prevtrack",
+            "circular": "playpause"
+        }
+    ],
+    "Music": [
+        {
+            "idle": "None",
+            "up-swipe": "volumeup",
+            "down-swipe": "volumedown",
+            "right-tilt": "nexttrack",
+            "left-tilt": "prevtrack",
+            "circular": "playpause"
+        }
+    ],
+    "Games": [
+        {
+            "idle": "None",
+            "up-swipe": "volumeup",
+            "down-swipe": "volumedown",
+            "right-tilt": "nexttrack",
+            "left-tilt": "prevtrack",
+            "circular": "playpause"
+        }
+    ]
+}

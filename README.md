@@ -2,8 +2,8 @@
 * Cmake
 * Pico SDK
 * python
-* pyserial (pip3 install pyserial)
-* pyautogui (pip3 install pyautogui)
+* pyserial ``` pip3 install pyserial ```
+* pyautogui ``` pip3 install pyautogui ```
 
 # Steps
 ### 1. connect your pico while holding the bootsel button
@@ -26,7 +26,13 @@
 * PICO VBUS -> HC-05 VCC
 * PICO GND  -> HC-05 GND
 
+# Bluetooth_Reciever
+Python script to recieve data from the Pico and perform shortcuts saved in **config.json** file.  
+If no custom configuration is passed in command arguments, the script uses the default configuration.  
+##### To run :     
+    python gGloveReciever.py <COM_NUMBER> <CONFIG_OBJECT(optional)>
+
 > NOTE:
 >
 > * THIS BRANCH USES **BLUETOOTH** NOT USB
-> * THIS PYTHON SCRIPT IS INTENDED FOR **WINDOWS**
+> * THIS PYTHON SCRIPT IS INTENDED FOR **WINDOWS**, IT HAS NOT BEEN TESTED WITH OTHER PLATFORMS.
