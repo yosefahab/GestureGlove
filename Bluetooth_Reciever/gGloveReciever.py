@@ -16,14 +16,20 @@ def performAction(gest):
     global prevKey
     # prevents double actions (essentially canceling or doubling previous action)
     if prevKey != gest and gest != "idle":
-        pyautogui.press(gestures.get(gest))
+        g = gestures.get(gest)
+        # if shortcut is a combination of keys seperated by +
+        if '+' in g:
+            pyautogui.hotkey(*g.split('+'))
+        else:
+            pyautogui.press(g)
+
     prevKey = gest
     return
 
 
 def retrieveConfig(obj):
     global gestures
-    with open("config.json") as json_file:
+    with open('config.json') as json_file:
         gestures = dict(*json.loads(json_file.read())[obj])
 
 
@@ -32,7 +38,7 @@ def main(argv):
     try:
         if len(argv) < 2:
             raise Exception("Please specify port!")
-        elif len(argv) > 3:
+        elif (len(argv) > 3):
             raise Exception("Incorrect number of arguments!")
         # custom configuration object passed in program argv
         obj = argv[2] if len(argv) == 3 else "Default"
@@ -48,7 +54,7 @@ def main(argv):
     else:
         print("Listening to device on port: %s!" % com)
         while True:
-            time.sleep(0.75)
+            time.sleep(.75)
             try:
                 gest = retrieveData(ser).strip()
                 # remove this print if uninterested in output
@@ -65,6 +71,7 @@ if __name__ == "__main__":
 
 
 # The following are all available keys in PYAUTOGUI
+# You may use a combination of them seperated by '+'
 # ['\t', '\n', '\r', ' ', '!', '"', '#', '$', '%', '&', "'", '(', ')',
 # '*', '+', ',', '-', '.', '/', '0', '1', '2', '3', '4', '5', '6', '7', '8', '9',
 # ':', ';', '<', '=', '>', '?', '@', '[', '\\', ']', '^', '_', '`',

@@ -28,5 +28,15 @@
             "left-tilt": "prevtrack",
             "circular": "playpause"
         }
+    ],
+    "General": [
+        {
+            "idle": "None",
+            "up-swipe": "Winleft+d",
+            "down-swipe": "Winleft+d",
+            "right-tilt": "alt+tab",
+            "left-tilt": "alt+shift+tab",
+            "circular": "ctrl+tab"
+        }
     ]
 }
