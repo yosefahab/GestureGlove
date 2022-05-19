@@ -1,3 +1,8 @@
+# Gesture Glove
+ML Gesture recognition using edge impulse & RPI pico.
+Detects gestures and performs shortcuts accordingly using a python script.
+###### Fun fact: EdgeImpulse mentioned GestureGlove on [linkedin](https://www.linkedin.com/feed/update/urn:li:activity:6909140611157606400/) on #PiDay
+
 # Requirements
 * Cmake
 * Pico SDK
