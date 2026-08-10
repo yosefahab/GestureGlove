@@ -1,0 +1,4 @@
+{
+    "_comment": "Single source of truth for constants shared by the firmware and the host receiver. The firmware gets these via a generated protocol.h; the host reads this file directly.",
+    "baud_rate": 9600
+}

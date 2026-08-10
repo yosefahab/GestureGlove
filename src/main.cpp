@@ -5,6 +5,8 @@
 #include "hardware/uart.h"
 #include "./ei_classifier_porting.cpp"
 #include "ei_run_classifier.h"
+// generated from protocol.json, shared with the host receiver
+#include "protocol.h"
 //  MPU SCL -> PICO GPIO 5
 //  MPU SDA -> PICO GPIO 4
 //  HC-05 RX -> PICO GPIO 0 (UART TX)
@@ -18,8 +20,6 @@
 // The gyroscope’s sensitivity per LSBi =  32.8 for +-1000 deg/s
 #define gyroSensitivity 32.8
 
-// HC-05 default UART baud rate
-#define BD_RATE 9600
 // standard-mode I2C, 100 kHz
 #define I2C_RATE 100000
 
@@ -220,7 +220,7 @@ int main()
     gpio_pull_up(PICO_DEFAULT_I2C_SCL_PIN);
 
     // Initialize UART
-    uart_init(UART_ID, BD_RATE);
+    uart_init(UART_ID, GLOVE_BAUD_RATE);
     // 0 is TX 1 is RX
     gpio_set_function(UART_TX_PIN, GPIO_FUNC_UART);
     gpio_set_function(UART_RX_PIN, GPIO_FUNC_UART);

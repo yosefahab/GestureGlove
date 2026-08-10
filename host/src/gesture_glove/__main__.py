@@ -9,10 +9,9 @@ import serial
 
 from .actions import IDLE_GESTURE, Keyboard, perform, resolve_binding
 from .config import DEFAULT_PROFILE, GestureProfile, read_config, select_profile
+from .protocol import read_protocol
 from .receiver import open_port, read_gesture
 
-# must match BD_RATE in src/main.cpp (HC-05 default)
-BAUD_RATE = 9600
 READ_TIMEOUT_S = 10.0
 # the firmware emits one classification per inference window; polling faster
 # only re-reads labels that resolve_binding then discards as repeats
@@ -20,6 +19,8 @@ POLL_INTERVAL_S = 0.75
 # config.json sits at the project root rather than inside the package, so it
 # stays editable without touching installed code
 DEFAULT_CONFIG_PATH = Path(__file__).resolve().parents[2] / "config.json"
+# protocol.json lives at the repo root because the firmware build reads it too
+DEFAULT_PROTOCOL_PATH = Path(__file__).resolve().parents[3] / "protocol.json"
 
 USAGE = "usage: glove-receiver <COM_PORT> [PROFILE]"
 
@@ -63,8 +64,13 @@ def main(argv: list[str]) -> int:
         print(f"No such profile: {profile_name}. Available: {', '.join(config)}")
         return 1
 
-    print(f"Searching for device on port: {port_name}...")
-    port = open_port(port_name, BAUD_RATE, READ_TIMEOUT_S)
+    protocol = read_protocol(DEFAULT_PROTOCOL_PATH)
+    if protocol is None:
+        print(f"Could not read protocol: {DEFAULT_PROTOCOL_PATH}")
+        return 1
+
+    print(f"Searching for device on port: {port_name} at {protocol.baud_rate} baud...")
+    port = open_port(port_name, protocol.baud_rate, READ_TIMEOUT_S)
     if port is None:
         print("Device not connected! Terminating...")
         return 1

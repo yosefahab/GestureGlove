@@ -1,4 +1,5 @@
-cmake_minimum_required(VERSION 3.12)
+# 3.19 for string(JSON), used to read protocol.json below
+cmake_minimum_required(VERSION 3.19)
 
 set(MODEL_FOLDER .)
 set(EI_SDK_FOLDER vendor/edge-impulse-sdk)
@@ -16,6 +17,14 @@ pico_sdk_init()
 
 # Tell CMake where to find the executable source file
 add_executable(${PROJECT_NAME} src/main.cpp)
+
+# Generate protocol.h from the same file the host receiver reads, so the two
+# sides cannot drift apart the way the baud rate once did
+file(READ ${CMAKE_CURRENT_LIST_DIR}/protocol.json PROTOCOL_JSON)
+string(JSON GLOVE_BAUD_RATE GET "${PROTOCOL_JSON}" baud_rate)
+configure_file(src/protocol.h.in ${CMAKE_BINARY_DIR}/generated/protocol.h @ONLY)
+set_property(DIRECTORY APPEND PROPERTY CMAKE_CONFIGURE_DEPENDS protocol.json)
+target_include_directories(${PROJECT_NAME} PRIVATE ${CMAKE_BINARY_DIR}/generated)
 
 
 include(${EI_SDK_FOLDER}/cmake/utils.cmake)

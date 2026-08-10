@@ -1,0 +1,5 @@
+// Generated from protocol.json by CMake. Do not edit; edit protocol.json.
+#pragma once
+
+// UART link to the HC-05, and so to the host receiver
+#define GLOVE_BAUD_RATE @GLOVE_BAUD_RATE@

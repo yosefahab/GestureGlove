@@ -16,4 +16,9 @@ requires = ["hatchling"]
 build-backend = "hatchling.build"
 
 [tool.pyrefly]
-project-includes = ["src"]
+project-includes = ["src", "tests"]
+
+[dependency-groups]
+dev = [
+    "pytest>=9.1.1",
+]
