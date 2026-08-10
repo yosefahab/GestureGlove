@@ -7,8 +7,8 @@
 #include "ei_run_classifier.h"
 //  MPU SCL -> PICO GPIO 5
 //  MPU SDA -> PICO GPIO 4
-//  HC-05 TX -> PICO GGPIO 0
-//  HC-05 RX -> PICO GGPIO 1
+//  HC-05 RX -> PICO GPIO 0 (UART TX)
+//  HC-05 TX -> PICO GPIO 1 (UART RX)
 #define ledPin 25
 #define UART_TX_PIN 0
 #define UART_RX_PIN 1
@@ -18,7 +18,10 @@
 // The gyroscope’s sensitivity per LSBi =  32.8 for +-1000 deg/s
 #define gyroSensitivity 32.8
 
+// HC-05 default UART baud rate
 #define BD_RATE 9600
+// standard-mode I2C, 100 kHz
+#define I2C_RATE 100000
 
 volatile bool mpuReady = false;
 int16_t acceleration[3], gyro[3];
@@ -210,7 +213,7 @@ int main()
     gpio_set_dir(ledPin, GPIO_OUT);
 
     // Initialize I2C HW block, and set baud rate
-    i2c_init(i2c_default, BD_RATE);
+    i2c_init(i2c_default, I2C_RATE);
     gpio_set_function(PICO_DEFAULT_I2C_SDA_PIN, GPIO_FUNC_I2C);
     gpio_set_function(PICO_DEFAULT_I2C_SCL_PIN, GPIO_FUNC_I2C);
     gpio_pull_up(PICO_DEFAULT_I2C_SDA_PIN);

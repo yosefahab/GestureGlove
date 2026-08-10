@@ -1,7 +1,7 @@
 cmake_minimum_required(VERSION 3.12)
 
 set(MODEL_FOLDER .)
-set(EI_SDK_FOLDER edge-impulse-sdk)
+set(EI_SDK_FOLDER vendor/edge-impulse-sdk)
 
 # Include build functions from Pico SDK
 include($ENV{PICO_SDK_PATH}/external/pico_sdk_import.cmake)
@@ -15,10 +15,10 @@ set(CMAKE_CXX_STANDARD 17)
 pico_sdk_init()
 
 # Tell CMake where to find the executable source file
-add_executable(${PROJECT_NAME} main.cpp)
+add_executable(${PROJECT_NAME} src/main.cpp)
 
 
-include(${MODEL_FOLDER}/edge-impulse-sdk/cmake/utils.cmake)
+include(${EI_SDK_FOLDER}/cmake/utils.cmake)
 
 # Link to pico_stdlib (gpio, time, etc. functions)
 target_link_libraries(${PROJECT_NAME} pico_stdlib hardware_i2c hardware_uart)
@@ -34,6 +34,9 @@ target_include_directories(${PROJECT_NAME} PRIVATE
     ${MODEL_FOLDER}/model-parameters
 )
 target_include_directories(${PROJECT_NAME} PRIVATE
+    # the sdk includes itself as "edge-impulse-sdk/...", so its parent
+    # directory has to be on the include path
+    vendor
     ${EI_SDK_FOLDER}
     ${EI_SDK_FOLDER}/third_party/ruy
     ${EI_SDK_FOLDER}/third_party/gemmlowp

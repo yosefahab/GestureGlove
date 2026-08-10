@@ -1,0 +1,6 @@
+# CMake / Pico build output
+build/
+
+# Python
+.venv/
+__pycache__/

@@ -1,0 +1,19 @@
+[project]
+name = "gesture-glove"
+version = "0.1.0"
+description = "Host side receiver for the gesture glove"
+requires-python = ">=3.13"
+dependencies = [
+    "pyautogui>=0.9.54",
+    "pyserial>=3.5",
+]
+
+[project.scripts]
+glove-receiver = "gesture_glove.__main__:run"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.pyrefly]
+project-includes = ["src"]
