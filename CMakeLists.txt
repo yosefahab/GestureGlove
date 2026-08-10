@@ -32,9 +32,24 @@ include(${EI_SDK_FOLDER}/cmake/utils.cmake)
 # Link to pico_stdlib (gpio, time, etc. functions)
 target_link_libraries(${PROJECT_NAME} pico_stdlib hardware_i2c hardware_uart)
 
-# Enable uart output, disable usb output
-pico_enable_stdio_usb(${PROJECT_NAME} 0)
-pico_enable_stdio_uart(${PROJECT_NAME} 1)
+# How the classified gesture reaches the host. This used to be the difference
+# between two long lived branches, which meant fixes had to be cherry picked
+# between them; it is a build option so one trunk serves both.
+set(GLOVE_TRANSPORT "uart" CACHE STRING "Link to the host: uart (HC-05) or usb")
+set_property(CACHE GLOVE_TRANSPORT PROPERTY STRINGS uart usb)
+
+if(GLOVE_TRANSPORT STREQUAL "uart")
+    pico_enable_stdio_usb(${PROJECT_NAME} 0)
+    pico_enable_stdio_uart(${PROJECT_NAME} 1)
+    target_compile_definitions(${PROJECT_NAME} PRIVATE GLOVE_TRANSPORT_UART)
+elseif(GLOVE_TRANSPORT STREQUAL "usb")
+    pico_enable_stdio_usb(${PROJECT_NAME} 1)
+    pico_enable_stdio_uart(${PROJECT_NAME} 0)
+    target_compile_definitions(${PROJECT_NAME} PRIVATE GLOVE_TRANSPORT_USB)
+else()
+    message(FATAL_ERROR "GLOVE_TRANSPORT must be 'uart' or 'usb', got '${GLOVE_TRANSPORT}'")
+endif()
+message(STATUS "Host transport (GLOVE_TRANSPORT) is '${GLOVE_TRANSPORT}'")
 
 target_include_directories(${PROJECT_NAME} PRIVATE
     ${MODEL_FOLDER}

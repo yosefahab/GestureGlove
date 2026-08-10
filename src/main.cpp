@@ -76,11 +76,13 @@ static void init_peripherals(void)
     gpio_pull_up(PICO_DEFAULT_I2C_SDA_PIN);
     gpio_pull_up(PICO_DEFAULT_I2C_SCL_PIN);
 
+#ifdef GLOVE_TRANSPORT_UART
     // Initialize UART
     uart_init(UART_ID, GLOVE_BAUD_RATE);
     // 0 is TX 1 is RX
     gpio_set_function(UART_TX_PIN, GPIO_FUNC_UART);
     gpio_set_function(UART_RX_PIN, GPIO_FUNC_UART);
+#endif
 }
 
 int main()

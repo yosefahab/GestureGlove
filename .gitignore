@@ -1,5 +1,6 @@
 # CMake / Pico build output
 build/
+build-*/
 
 # Python
 .venv/

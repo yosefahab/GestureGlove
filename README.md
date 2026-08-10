@@ -23,6 +23,9 @@ Detects gestures and performs shortcuts accordingly using a python script.
     export PICO_SDK_PATH=~/pico-sdk
     export PICO_TOOLCHAIN_PATH=/opt/homebrew/Cellar/arm-none-eabi-gcc@8/8.5.0_2
     mkdir build && cd build && cmake .. -DPICO_BOARD=pico && make -j
+
+Pass `-DGLOVE_TRANSPORT=usb` to send gestures over USB serial instead of the HC-05.
+The default is `uart`.
 ### 3. copy build/gGlove.uf2 to RPI-RP2 when its connected
 
 > On macOS, Homebrew's core `arm-none-eabi-gcc` ships without newlib and fails to link
