@@ -16,7 +16,7 @@ set(CMAKE_CXX_STANDARD 17)
 pico_sdk_init()
 
 # Tell CMake where to find the executable source file
-add_executable(${PROJECT_NAME} src/main.cpp)
+add_executable(${PROJECT_NAME} src/main.cpp src/mpu6050.cpp)
 
 # Generate protocol.h from the same file the host receiver reads, so the two
 # sides cannot drift apart the way the baud rate once did

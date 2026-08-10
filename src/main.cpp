@@ -7,6 +7,7 @@
 #include "ei_run_classifier.h"
 // generated from protocol.json, shared with the host receiver
 #include "protocol.h"
+#include "mpu6050.h"
 //  MPU SCL -> PICO GPIO 5
 //  MPU SDA -> PICO GPIO 4
 //  HC-05 RX -> PICO GPIO 0 (UART TX)
@@ -15,194 +16,50 @@
 #define UART_TX_PIN 0
 #define UART_RX_PIN 1
 #define UART_ID uart0
-// The accelerometer's sensitivity per LSBi = 4096.0 for +-8g
-#define accSensitivity 4096.0
-// The gyroscope’s sensitivity per LSBi =  32.8 for +-1000 deg/s
-#define gyroSensitivity 32.8
 
 // standard-mode I2C, 100 kHz
 #define I2C_RATE 100000
 
-volatile bool mpuReady = false;
-int16_t acceleration[3], gyro[3];
-
-// mpu6050 address
-uint8_t mpuAddr = 0x68;
-
-#ifdef i2c_default
-static void setup_mpu()
+// Fill one inference window with consecutive readings, paced to the rate the
+// model was trained at.
+static void sample_window(float *buffer)
 {
-    // reset mpu
-    uint8_t buffer[] = {0x6B, 0x80};
-    i2c_write_blocking(i2c_default, mpuAddr, buffer, 2, true);
-    sleep_ms(100);
+    for (size_t i = 0; i < EI_CLASSIFIER_DSP_INPUT_FRAME_SIZE;
+         i += EI_CLASSIFIER_RAW_SAMPLES_PER_FRAME)
+    {
+        // Determine the next tick (and then sleep later)
+        uint64_t next_tick = ei_read_timer_ms() + EI_CLASSIFIER_INTERVAL_MS;
 
-    // disable all interrupts
-    buffer[0] = 0x38;
-    buffer[1] = 0x00;
-    i2c_write_blocking(i2c_default, mpuAddr, buffer, 2, true);
+        mpu_sample_t sample = mpu_read();
+        buffer[i] = sample.acceleration[0];
+        buffer[i + 1] = sample.acceleration[1];
+        buffer[i + 2] = sample.acceleration[2];
+        buffer[i + 3] = sample.gyro[0];
+        buffer[i + 4] = sample.gyro[1];
+        buffer[i + 5] = sample.gyro[2];
 
-    // disable fifo
-    buffer[0] = 0x23;
-    buffer[1] = 0x00;
-    i2c_write_blocking(i2c_default, mpuAddr, buffer, 2, true);
-
-    // turn on internal clock source(8 MHz) and disable temperature sensor
-    buffer[0] = 0x6B;
-    buffer[1] = 0x08;
-    i2c_write_blocking(i2c_default, mpuAddr, buffer, 2, true);
-
-    // disable I2C master
-    buffer[0] = 0x24;
-    buffer[1] = 0x00;
-    i2c_write_blocking(i2c_default, mpuAddr, buffer, 2, true);
-
-    // reset FIFO and DMP
-    buffer[0] = 0x6A;
-    buffer[1] = 0x0C;
-    i2c_write_blocking(i2c_default, mpuAddr, buffer, 2, true);
-
-    //  Configure gyro and accelerometer
-    // sample rate = gyroscope output rate/(1 + SMPLRT_DIV)
-
-    // set DLPF_CFG (Digital low-pass filter) to 188 Hz
-    buffer[0] = 0x1A;
-    buffer[1] = 0x01;
-    i2c_write_blocking(i2c_default, mpuAddr, buffer, 2, true);
-
-    // since SMPLRT_DIV = 0 && gyro output rate = 1kHz -> sample rate = 1 Khz
-    buffer[0] = 0x19;
-    buffer[1] = 0x00;
-    i2c_write_blocking(i2c_default, mpuAddr, buffer, 2, true);
-
-    // set accelerometer full-scale to +-10g, least sensitivity
-    buffer[0] = 0x1C;
-    buffer[1] = 0x10;
-    i2c_write_blocking(i2c_default, mpuAddr, buffer, 2, true);
-
-    // Set gyro full-scale to +-1000 degrees/sec, least sensitivity
-    buffer[0] = 0x1B;
-    buffer[1] = 0x10;
-    i2c_write_blocking(i2c_default, mpuAddr, buffer, 2, false);
-
-    sleep_ms(100);
+        sleep_ms(next_tick - ei_read_timer_ms());
+    }
 }
 
-static void read_mpu_data()
+// Return the label of the highest scoring class in a classifier result.
+static const char *best_label(const ei_impulse_result_t &result)
 {
-    uint8_t buffer[6];
-
-    // Start reading acceleration registers from register 0x3B for 6 bytes
-    uint8_t regAddr = 0x3B;
-    i2c_write_blocking(i2c_default, mpuAddr, &regAddr, 1, true);
-    i2c_read_blocking(i2c_default, mpuAddr, buffer, 6, true);
-
-    for (int i = 0; i < 3; i++)
+    int mxIdx = 0;
+    float mx = -1;
+    for (size_t ix = 0; ix < EI_CLASSIFIER_LABEL_COUNT; ix++)
     {
-        // ACCEL_XOUT[i*2] | ACCEL_XOUT[i*2+1]
-        acceleration[i] = (buffer[i * 2] << 8 | buffer[(i * 2) + 1]);
+        if (result.classification[ix].value >= mx)
+        {
+            mx = result.classification[ix].value;
+            mxIdx = ix;
+        }
     }
-
-    // Now gyro data from reg 0x43 for 6 bytes
-    // The register auto increments on each read
-    regAddr = 0x43;
-    i2c_write_blocking(i2c_default, mpuAddr, &regAddr, 1, true);
-    i2c_read_blocking(i2c_default, mpuAddr, buffer, 6, false);
-
-    for (int i = 0; i < 3; i++)
-    {
-        gyro[i] = (buffer[i * 2] << 8 | buffer[(i * 2) + 1]);
-    }
-}
-#endif
-
-float AccErrorX, AccErrorY, AccErrorZ;
-float gyroErrorX, gyroErrorY, gyroErrorZ;
-void calibrate_mpu()
-{
-
-    uint8_t regAddr[] = {0x6A, 0x40};
-
-    // configure FIFO to capture accelerometer and gyro data for bias calculation
-
-    // enable user control FIFO
-    i2c_write_blocking(i2c_default, mpuAddr, regAddr, 2, true);
-    // enable gyro and accelerometer sensors for FIFO  (max size 1024 bytes)
-    regAddr[0] = 0x23;
-    regAddr[1] = 0x78;
-    i2c_write_blocking(i2c_default, mpuAddr, regAddr, 2, true);
-
-    // accumulate 80 samples in 80 milliseconds = 960 bytes
-    sleep_ms(80);
-
-    // disable FIFO
-    regAddr[0] = 0x6A;
-    regAddr[1] = 0x00;
-    i2c_write_blocking(i2c_default, mpuAddr, regAddr, 2, true);
-
-    uint16_t fifo_count, packet_count;
-    uint8_t data[12];
-
-    // read FIFO sample count
-    regAddr[0] = 0x72;
-    i2c_write_blocking(i2c_default, mpuAddr, regAddr, 1, true);
-    i2c_read_blocking(i2c_default, mpuAddr, data, 2, false);
-    fifo_count = (data[0] << 8) | data[1];
-    // How many sets of full gyro and accelerometer data for averaging
-    packet_count = fifo_count / 12;
-
-    for (int i = 0; i < packet_count; i++)
-    {
-        // read data for averaging
-        int16_t accel_temp[3], gyro_temp[3];
-        regAddr[0] = 0x74;
-        i2c_write_blocking(i2c_default, mpuAddr, regAddr, 1, true);
-        i2c_read_blocking(i2c_default, mpuAddr, data, 12, false);
-
-        // Form signed 16-bit integer for each sample in FIFO
-        accel_temp[0] = ((data[0] << 8) | data[1]);
-        accel_temp[1] = ((data[2] << 8) | data[3]);
-        accel_temp[2] = ((data[4] << 8) | data[5]);
-        gyro_temp[0] = ((data[6] << 8) | data[7]);
-        gyro_temp[1] = ((data[8] << 8) | data[9]);
-        gyro_temp[2] = ((data[10] << 8) | data[11]);
-
-        AccErrorX += accel_temp[0];
-        AccErrorY += accel_temp[1];
-        AccErrorZ += accel_temp[2];
-        gyroErrorX += gyro_temp[0];
-        gyroErrorY += gyro_temp[1];
-        gyroErrorZ += gyro_temp[2];
-    }
-    // Normalize sums to get average count biases
-    AccErrorX /= packet_count;
-    AccErrorY /= packet_count;
-    AccErrorZ /= packet_count;
-    gyroErrorX /= packet_count;
-    gyroErrorY /= packet_count;
-    gyroErrorZ /= packet_count;
-
-    // Remove gravity from the z-axis accelerometer bias calculation
-    if (AccErrorZ > 0L)
-    {
-        AccErrorZ -= accSensitivity;
-    }
-    else
-    {
-        AccErrorZ += accSensitivity;
-    }
-
-    AccErrorX /= accSensitivity;
-    AccErrorY /= accSensitivity;
-    AccErrorZ /= accSensitivity;
-    gyroErrorX /= gyroSensitivity;
-    gyroErrorY /= gyroSensitivity;
-    gyroErrorZ /= gyroSensitivity;
+    return result.classification[mxIdx].label;
 }
 
-int main()
+static void init_peripherals(void)
 {
-
     // Initialize chosen serial port (usb in this case)
     stdio_init_all();
     // Make the I2C pins available to picotool
@@ -224,47 +81,32 @@ int main()
     // 0 is TX 1 is RX
     gpio_set_function(UART_TX_PIN, GPIO_FUNC_UART);
     gpio_set_function(UART_RX_PIN, GPIO_FUNC_UART);
+}
 
-    setup_mpu();
-    calibrate_mpu();
+int main()
+{
+    init_peripherals();
+
+    mpu_setup();
+    // The bias is measured but deliberately not subtracted: the model was
+    // trained on uncalibrated samples, so removing the offset now would shift
+    // the input distribution away from what it learned.
+    mpu_calibrate();
 
     while (true)
     {
         gpio_put(ledPin, !gpio_get(ledPin));
 
         float buffer[EI_CLASSIFIER_DSP_INPUT_FRAME_SIZE] = {0};
-        for (size_t i = 0; i < EI_CLASSIFIER_DSP_INPUT_FRAME_SIZE; i += EI_CLASSIFIER_LABEL_COUNT)
-        {
-            // Determine the next tick (and then sleep later)
-            uint64_t next_tick = ei_read_timer_ms() + EI_CLASSIFIER_INTERVAL_MS;
-            read_mpu_data();
-            buffer[i] = acceleration[0] / accSensitivity;
-            buffer[i + 1] = acceleration[1] / accSensitivity;
-            buffer[i + 2] = acceleration[2] / accSensitivity;
-            buffer[i + 3] = gyro[0] / gyroSensitivity;
-            buffer[i + 4] = gyro[1] / gyroSensitivity;
-            buffer[i + 5] = gyro[2] / gyroSensitivity;
+        sample_window(buffer);
 
-            sleep_ms(next_tick - ei_read_timer_ms());
-        }
         signal_t signal;
-        int err = numpy::signal_from_buffer(buffer, EI_CLASSIFIER_DSP_INPUT_FRAME_SIZE, &signal);
+        numpy::signal_from_buffer(buffer, EI_CLASSIFIER_DSP_INPUT_FRAME_SIZE, &signal);
         ei_impulse_result_t result = {0};
-        err = run_classifier(&signal, &result, false);
+        run_classifier(&signal, &result, false);
 
-        int mxIdx = 0;
-        float mx = -1;
-        for (size_t ix = 0; ix < EI_CLASSIFIER_LABEL_COUNT; ix++)
-        {
-            if (result.classification[ix].value >= mx)
-            {
-                mx = result.classification[ix].value;
-                mxIdx = ix;
-            }
-        }
         // print class with highest probability
-        // printf("%s: %.5f\n", result.classification[mxIdx].label, result.classification[mxIdx].value);
-        printf("%s\n", result.classification[mxIdx].label);
+        printf("%s\n", best_label(result));
     }
 
     return 0;
